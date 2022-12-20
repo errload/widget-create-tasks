@@ -6,7 +6,7 @@
     "tour_description": "Краткий текст, который будет выведен в момент показа тура виджета"
   },
   "settings": {
-    "create_task": "Минимальное количество символов для создания задачи",
-    "checkboxes_create": "checkboxes_create"
+    "min_length": "Минимальное количество символов для создания задачи",
+    "checkboxes": "checkboxes_create"
   }
 }
