@@ -9,7 +9,9 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
             task_ID = 0, // ID задачи
             blockControls = null, // блок настроек виджета
             checkbox = null, // чекбокс в настройках виджета
-            min_length = null; // минимальное количество символов создания задачи
+            min_length = null, // минимальное количество символов создания задачи
+            groups = AMOCRM.constant('groups'), // группы пользователей
+            managers = AMOCRM.constant('managers'); // пользователи
 
         // функция обновления настроек виджета
         this.setSettings = function (checkboxes) {
@@ -100,42 +102,55 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
                     $('.widget_settings_block .subscribers__wrapper .link__users').unbind('click');
                     $('.widget_settings_block .subscribers__wrapper .link__users').bind('click', function (e) {
                         e.preventDefault();
+                        // если пользователи уже показаны, пропускаем
+                        if ($('.widget_settings_block .subscribers__wrapper .js-view-container').length) return;
 
                         // wrapper, кнопки и поиск
                         $('.widget_settings_block .subscribers__wrapper .subscribers').append(`
                             <div class="subscribers-container js-container subscribers-container--full" 
-                                style="display: block; width: 250px;">
+                                style="display: block; width: 250px; margin-top: 10px; border: 1px solid #c3c3c3;">
                                 
                                 <div class="js-view-container" style="background: #ffffff;">
                                     <div class="subscribers-full">
                                         <div class="js-users-picker users-picker">
                                         
-                                            <div>
+                                            <div data-multisuggest-id="">
                                                 <div class="
                                                     users-picker-controls js-users-picker-controls 
-                                                    users-picker-controls--disabled
-                                                    " style="background: #fff;">
+                                                    users-picker-controls--disabled" 
+                                                    style="background: #fff; height: 45px; justify-content: center;
+                                                        display: flex; align-items: center; flex-direction: row;">
                                                     
                                                     <button class="
-                                                        users-picker-controls__cancel js-users-picker-controls-cancel 
-                                                        " style="cursor: pointer;">
+                                                        users-picker-controls__cancel js-users-picker-controls-cancel" 
+                                                        style="cursor: pointer; color: #92989b; margin-right: 12px;
+                                                            background: 0 0; font-weight: 700; font-size: 13px;">
                                                         Отменить
                                                     </button>
                                                     <button class="
-                                                        users-picker-controls__save js-users-picker-controls-save 
-                                                        " style="cursor: pointer;">
+                                                        users-picker-controls__save js-users-picker-controls-save" 
+                                                        style="cursor: pointer; width: 80px; height: 26px;
+                                                            border-radius: 2px; background-color: #4382ee;
+                                                            border: solid 1px #3376e8; color: #fff;
+                                                            font-weight: 700; font-size: 13px;">
                                                         Сохранить
                                                     </button>
                                                 </div>
 
-                                                <div class="users-picker-search" style="background: #ffffff;">
-                                                    <span class="users-picker-search__icon">
-                                                        <svg class="svg-icon svg-common--filter-search-dims">
+                                                <div class="users-picker-search" 
+                                                    style="background: #ffffff; border-top: 1px solid #d0d0d0;
+                                                        border-bottom: 1px solid #d0d0d0; height: 36px; display: flex;
+                                                        align-items: center; flex-direction: row;">
+                                                    <span class="users-picker-search__icon"
+                                                        style="padding: 4px 10px 0; fill: #6e747a;">
+                                                        <svg class="svg-icon svg-common--filter-search-dims"
+                                                            style="width: 16px; height: 15px;">
                                                             <use xlink:href="#common--filter-search"></use>
                                                         </svg>
                                                     </span>
                                                     <input class="users-picker-search__field js-multisuggest-input" 
-                                                        style="width: 5px;">
+                                                        style="width: 5px; flex-grow: 1; padding: 0 10px 0 0;
+                                                            height: 100%;">
                                                     <tester style="
                                                         position: absolute; top: -9999px; left: -9999px; width: auto; 
                                                         font-size: 14px; font-family: PT Sans, Arial, sans-serif; 
@@ -145,16 +160,22 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
                                                 </div>
                                             </div>
                                             
-                                            <div class="js-multisuggest-suggest" data-multisuggest-id 
+                                            <div class="js-multisuggest-suggest" data-multisuggest-id="" 
                                                 style="display: block;">
                                             </div>
 
                                             <div class="js-multisuggest-list" data-is-suggest="y" 
-                                                data-multisuggest-id style="display: block;">
+                                                data-multisuggest-id="" style="display: block;" datatype="display: block;">
                                                 
                                                 <div class="multisuggest__suggest js-multisuggest-suggest custom-scroll" 
-                                                    style="max-height: 270px;">
-                                                    <div class="users-select-row"></div>
+                                                    style="max-height: 270px; border-radius: 0; display: flex;
+                                                        flex-direction: column; list-style-type: none; overflow-x: hidden;
+                                                        overflow-y: auto; max-height: 300px;">
+                                                    <div class="users-select-row" style="
+                                                        margin: 0; padding: 0; border: 0; font: inherit;
+                                                        vertical-align: baseline; text-rendering: geometricPrecision;
+                                                        -webkit-font-smoothing: antialiased; outline: 0;
+                                                    "></div>
                                                 </div>
                                             </div>
                                             
@@ -163,6 +184,74 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
                                 </div>
                             </div>
                         `);
+
+                        // перебираем группы и пользователей этих групп
+                        $.each(groups, function (key, value) {
+                            var users = [], group_ID = key;
+
+                            $.each(managers, function () {
+                                // если пользователя в группе нет, пропускаем
+                                if (this.group != key) return;
+                                // если пользователь не активен, пропускаем
+                                if (!this.active) return;
+                                // добавляем пользователя в массив
+                                users.push({id: this.id, title: this.title});
+                            });
+
+                            // добавляем группу, если в ней есть пользователи
+                            if (!users.length) return;
+
+                            $('.widget_settings_block .subscribers__wrapper .multisuggest__suggest').append(`
+                                <div class="users-select-row__inner group-color-wrapper">
+                                    <div class="users-picker-item users-picker-item--group  
+                                        users-select__head group-color multisuggest__suggest-item"
+                                        data-title="${ value }" data-group="y" data-id="${ group_ID }"
+                                        style="display: flex; flex-direction: row; align-items: center;">
+                                        
+                                        <div class="users-picker-item__title users-select__head-title"
+                                            style="flex-grow: 1; flex-shrink: 1;">
+                                            <span>${ value }</span>
+                                        </div>
+                                        <div class="users-picker-item__pin"
+                                            style="width: 14px; height: 14px; margin: 0 16px; 
+                                            flex-shrink: 0; color: #e4e4e4;">
+                                            
+                                            <svg class="svg-icon svg-cards--pin-dims"
+                                                style="width: 14px; height: 14px;">
+                                                <use xlink:href="#cards--pin"></use>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="users-select__body" data-id="${ group_ID }"></div>
+                                </div>
+                            `);
+
+                            // добавляем пользователей к группе
+                            $.each(users, function () {
+                                $(`.users-select__body[data-id="${ group_ID }"]`).append(`
+                                    <div class="users-picker-item users-select__body__item"
+                                        id="select_users__user-${ this.id }" data-group="${ group_ID }" 
+                                        data-id="${ this.id }" 
+                                        style="display: flex; flex-direction: row; align-items: center;">
+                                        
+                                        <div class="users-picker-item__title multisuggest__suggest-item 
+                                            js-multisuggest-item true"
+                                            style="padding: 8px 10px; display: flex; align-items: center;
+                                            flex-grow: 1; flex-shrink: 1; font-size: 15px;">
+                                            ${ this.title }
+                                        </div>
+                                        <div class="users-picker-item__pin users-picker-select"
+                                            style="width: 14px; height: 14px; margin: 0 16px; 
+                                            flex-shrink: 0; color: #e4e4e4;">
+                                            <svg class="svg-icon svg-cards--pin-dims">
+                                                <use xlink:href="#cards--pin"></use>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                `);
+                            });
+                        });
+
                     });
 
 
@@ -205,11 +294,6 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
         //     $('a.linkUsers').bind('click', function (e) {
         //         e.preventDefault();
         //
-
-        //
-        //         // пользователи и группы
-        //         var groups = AMOCRM.constant('groups'),
-        //             managers = AMOCRM.constant('managers');
         //
         //         // перебираем группы и пользователей этих групп
         //         $.each(groups, function (key, value) {
