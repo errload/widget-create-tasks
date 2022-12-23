@@ -727,15 +727,6 @@ define(['jquery', 'underscore', 'twigjs'], function ($, _, Twig) {
                 // в случае перезагрузки страницы или изменения значения
                 if (min_length === null) self.minLengthToInt();
 
-                // // template только для задач и карточек
-                // if (AMOCRM.getBaseEntity() === 'todo' || AMOCRM.isCard() === true) {
-                //     // сообщение об ошибке на кнопке создания задачи
-                //     self.getTemplate('create_error_message_tasks', {}, function (template) {
-                //         // добавляем элемент на страницу
-                //         if (!$('body .create_error_message_tasks').length) $('body').append(template.render());
-                //     });
-                // }
-
                 // сообщение об ошибке только для задач и карточек
                 if (AMOCRM.getBaseEntity() === 'todo' || AMOCRM.isCard() === true) {
                     // если на странице его нет, добавляем
