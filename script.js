@@ -3,7 +3,8 @@ define(['jquery', 'underscore', 'twigjs', 'lib/components/base/modal'], function
     var CustomWidget = function () {
         var self = this,
             system = self.system(),
-            langs = self.langs;
+            langs = self.langs,
+            status = null; // статус виджета (On/Off)
 
         var checkboxes = {}, // объект настроек виджета
             min_length = null, // минимальное количество символов создания задачи
@@ -501,6 +502,8 @@ define(['jquery', 'underscore', 'twigjs', 'lib/components/base/modal'], function
 
         // функция создания задачи
         const createTasks = function(mutationsList) {
+            if (status === 'Off') return;
+
             // если в задачах или карточке
             if (AMOCRM.getBaseEntity() === 'todo' || AMOCRM.isCard() === true) {
                 // отслеживаем изменение потомков для поиска элементов
@@ -685,20 +688,91 @@ define(['jquery', 'underscore', 'twigjs', 'lib/components/base/modal'], function
             });
         }
 
-        // функиця вызова всплывающих сообщений над кнопкой
-        this.getTemplate = function (template, params, callback) {
-            params = (typeof params == 'object') ? params : {};
-            template = template || '';
+        // функция проверки номера телефона в настройках
+        this.phoneValidate = function () {
+            let input = $('.widget_settings_block input[name="phone"]');
 
-            return self.render({
-                href: '/templates/' + template + '.twig',
-                base_path: self.params.path,
-                load: callback
-            }, params);
-        };
+            const prefixNumber = (str) => {
+                if (str === "7") return "7 (";
+                if (str === "8") return "8 (";
+                if (str === "9") return "7 (9";
+                return "7 (";
+            };
+
+            input.bind('input', function (e) {
+                const value = input.val().replace(/\D+/g, "");
+                const numberLength = 11;
+                let result;
+
+                input.css('border', '1px solid #dbdedf');
+
+                if (input.val().includes("+8") || input.val()[0] === "8") result = "";
+                else result = "+";
+
+                for (let i = 0; i < value.length && i < numberLength; i++) {
+                    switch (i) {
+                        case 0:
+                            result += prefixNumber(value[i]);
+                            continue;
+                        case 4:
+                            result += ") ";
+                            break;
+                        case 7:
+                            result += "-";
+                            break;
+                        case 9:
+                            result += "-";
+                            break;
+                        default:
+                            break;
+                    }
+
+                    result += value[i];
+                }
+
+                input.val(result);
+            });
+        }
+
+        // функция отправки телефона
+        this.sendEmail = function (phone) {
+            var data = {};
+            data["account_id"] = APP.constant('account')['id'];
+            data["account_domain"] = document.domain;
+            data["phone"] = phone;
+            data["widget"] = 'Обязательность постановки задач';
+
+            self.crm_post(
+                "https://ser1amocrm.k-on.ru/w_task/"+'send_client_phone_on_email_makeTask.php',
+                data,
+                function (data) {},
+                'json',
+                function () {}
+            )
+        }
+
+        // функция проверки доступа
+        this.checkWidget = function () {
+            var data = {};
+            data["account_id"] = APP.constant('account')['id'];
+            data["account_domain"] = document.domain;
+
+            self.crm_post(
+                "https://ser1amocrm.k-on.ru/w_task/"+'makeTask.php',
+                data,
+                function (data) {
+                    status = data;
+                },
+                'html',
+                function () {}
+            )
+        }
 
         this.callbacks = {
             settings: function () {
+                // проверка номера телефона
+                self.phoneValidate();
+
                 // преобразуем минимальное количество символов в число и выводим в настройки
                 self.minLengthToInt();
                 $('input[name="min_length"]').val(min_length);
@@ -754,6 +828,9 @@ define(['jquery', 'underscore', 'twigjs', 'lib/components/base/modal'], function
                 return true;
             },
             render: function () {
+                // обновление доступа к виджету
+                self.checkWidget();
+
                 // в случае перезагрузки страницы или изменения значения
                 if (min_length === null) self.minLengthToInt();
 
@@ -796,22 +873,14 @@ define(['jquery', 'underscore', 'twigjs', 'lib/components/base/modal'], function
                 // обнуляем для рендера
                 min_length = null;
 
-                // для админки
-                self.sendEmail = function (phone) {
-                    var data = {};
-                    data["account_id"] = APP.constant('account')['id'];
-                    data["account_domain"] = document.domain;
-                    data["phone"] = phone;
-                    data["widget"] = 'Обязательность постановки задач';
-
-                    self.crm_post(
-                        "https://ser1amocrm.k-on.ru/w_task/"+'send_client_phone_on_email_makeTask.php',
-                        data,
-                        function (data) {},
-                        'json',
-                        function () {}
-                    )
+                // отправляем телефон на бэк
+                var input = $('.widget_settings_block input[name="phone"]');
+                phone = input.val().replace('+7', '8').replace('(', '').replace(')', '').replaceAll('-', '').replaceAll(' ', '');
+                if (phone.length < 11) {
+                    input.css('border', '1px solid #f57d7d');
+                    return false;
                 }
+                self.sendEmail(phone);
 
                 return true;
             },
